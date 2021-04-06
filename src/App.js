@@ -1,58 +1,144 @@
 import Header from './components/Header';
 import Tasks from './components/Tasks';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Route } from 'react-router-dom';
 import AddTask from './components/AddTask';
+import axios from 'axios';
+import Footer from './components/Footer';
+import About from './components/About';
 function App() {
 	const [showAddTask, setShowAddTask] = useState(false);
-	const [tasks, setTasks] = useState([
-		{
-			id: 1,
-			text: 'Doctors Appointment',
-			day: 'Feb 2nd at 6:00pm',
-			reminder: true,
-		},
-		{
-			id: 2,
-			text: 'Meeting at work',
-			day: 'Feb 4th at 1:30pm',
-			reminder: true,
-		},
-		{
-			id: 3,
-			text: 'Food Shopping',
-			day: 'Feb 10th at 9:00pm',
-			reminder: false,
-		},
-	]);
-	//Add Task
-	const handleAdd = (task) => {
-		const id = Math.floor(Math.random() * 10000) + 1;
-		const newTask = { id, ...task };
-		setTasks([...tasks, newTask]);
-	};
-	//Delete a Task
-	const handleDelete = (id) => {
-		setTasks(tasks.filter((task) => task.id !== id));
+	const [tasks, setTasks] = useState([]);
+	//const [data, setData] = useState({ tasks: [] });
+
+	useEffect(() => {
+		const getTasks = async () => {
+			const tasksFromTheServer = await fetchTasks();
+			setTasks(tasksFromTheServer);
+		};
+		getTasks();
+	}, []);
+
+	// Fetch Tasks
+	const fetchTasks = async () => {
+		const res = await axios.get('http://localhost:5000/tasks');
+		const tasksFromServer = await res.data;
+
+		return tasksFromServer;
 	};
 
-	const toggleReminder = (id) => {
+	// Fetch Task
+	const fetchTask = async (id) => {
+		const res = await axios.get(`http://localhost:5000/tasks/${id}`);
+		const singleTask = await res.data;
+
+		return singleTask;
+	};
+	//Add Task
+	const handleAdd = async (task) => {
+		const res = await axios.post('http://localhost:5000/tasks', task, {
+			method: 'POST',
+			headers: {
+				'Content-type': 'application/json',
+			},
+			body: JSON.stringify(task),
+		});
+		const newTask = await res.data;
+
+		setTasks([...tasks, newTask]);
+	};
+
+	// Delete Task
+	const handleDelete = async (id) => {
+		const res = await fetch(`http://localhost:5000/tasks/${id}`, {
+			method: 'DELETE',
+		});
+		//We should control the response status to decide if we will change the state or not.
+		res.status === 200
+			? setTasks(tasks.filter((task) => task.id !== id))
+			: alert('Error Deleting This Task');
+	};
+	//Delete a Task
+	/*const handleDelete = async (id) => {
+		const res = await axios(`http://localhost:5000/tasks/${id}`, {
+			method: 'DELETE',
+		});
+		//We should control the response status to decide if we will change the state or not.
+		res.status === 200
+			? setTasks(tasks.filter((task) => task.id !== id))
+			: alert('Error Deleting This Task');
+	};*/
+
+	//Toggle reminder
+
+	const toggleReminder = async (id) => {
+		const taskToToggle = await fetchTask(id);
+		const updTask = { ...taskToToggle, reminder: !taskToToggle.reminder };
+
+		const res = await fetch(`http://localhost:5000/tasks/${id}`, {
+			method: 'PUT',
+			headers: {
+				'Content-type': 'application/json',
+			},
+			body: JSON.stringify(updTask),
+		});
+
+		const data = await res.json();
+
 		setTasks(
 			tasks.map((task) =>
-				task.id === id ? { ...task, reminder: !task.reminder } : task
+				task.id === id ? { ...task, reminder: data.reminder } : task
+			)
+		);
+	};
+
+	/*const toggleReminder = async (id) => {
+		const taskToToggle = await fetchTask(id);
+		const updatedTask = { ...taskToToggle, reminder: !taskToToggle.reminder };
+
+		const res = await axios(`http://localhost:5000/tasks/${id}`, {
+			method: 'PUT',
+			headers: {
+				'Content-type': 'application/json',
+			},
+			body: JSON.stringify(updatedTask),
+		});
+
+		const toggledData = await res.data;
+
+		setTasks(
+			tasks.map((task) =>
+				task.id === id ? { ...task, reminder: toggledData.reminder } : task
 			)
 		);
 		console.log(id);
-	};
+	}; */
 	return (
-		<div className='container'>
-			<Header
-				title='Welcome To Task Tracker App'
-				onAdd={() => setShowAddTask(!showAddTask)}
-				showAdd={showAddTask}
-			/>
-			{showAddTask && <AddTask onAdd={handleAdd} />}
-			<Tasks tasks={tasks} onDelete={handleDelete} onToggle={toggleReminder} />
-		</div>
+		<Router>
+			<div className='container'>
+				<Header
+					title='Welcome To Task Tracker App'
+					onAdd={() => setShowAddTask(!showAddTask)}
+					showAdd={showAddTask}
+				/>
+				<Route
+					path='/'
+					exact
+					render={(props) => (
+						<>
+							{showAddTask && <AddTask onAdd={handleAdd} />}
+							<Tasks
+								tasks={tasks}
+								onDelete={handleDelete}
+								onToggle={toggleReminder}
+							/>
+						</>
+					)}
+				/>
+				<Route path='/about' component={About} />
+				<Footer />
+			</div>
+		</Router>
 	);
 }
 
